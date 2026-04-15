@@ -38,7 +38,7 @@ th { background:#eee; cursor:pointer; }
 
 <body>
 
-<h2>CRM ENTERPRISE FINAL</h2>
+<h2>CRM</h2><button onclick="resetApp()">♻️ Reset App</button><h2>CRM ENTERPRISE FINAL</h2>
 
 <button onclick="addRow()">➕ Nuevo</button>
 <button onclick="guardar()">💾 Guardar</button>
@@ -412,6 +412,26 @@ setInterval(updateAll,60000);
 
 
 <script>
+// RESET APP
+async function resetApp(){
+  if(!confirm("¿Resetear app?")) return;
+
+  if ('caches' in window){
+    const names = await caches.keys();
+    await Promise.all(names.map(n=>caches.delete(n)));
+  }
+
+  if ('serviceWorker' in navigator){
+    const regs = await navigator.serviceWorker.getRegistrations();
+    for(let r of regs){ await r.unregister(); }
+  }
+
+  localStorage.clear();
+  alert("App reseteada");
+  location.reload(true);
+}
+
+// SERVICE WORKER
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js');
