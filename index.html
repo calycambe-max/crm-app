@@ -7,11 +7,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <!-- PWA -->
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#0f172a">
 
-<!-- ICONOS -->
-<link rel="icon" href="icon-192.png">
+<!-- ICON -->
+<link rel="icon" href="./icon-192.png">
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
@@ -31,7 +31,7 @@ th{background:#eee;cursor:pointer;}
 
 <body>
 
-<h2>CRM APP</h2>
+<h2>CRM PRO</h2>
 
 <button onclick="addRow()">➕ Nuevo</button>
 <button onclick="guardar()">💾 Guardar</button>
@@ -46,30 +46,19 @@ th{background:#eee;cursor:pointer;}
 <input id="busquedaGlobal" placeholder="🔍 Buscar..." onkeyup="buscarGlobal()">
 
 <div class="dashboard">
-<div class="card" onclick="filtrarDashboard('Prospecto')" id="cPros"></div>
-<div class="card" onclick="filtrarDashboard('Oportunidad')" id="cOpo"></div>
-<div class="card" onclick="filtrarDashboard('Cliente')" id="cCli"></div>
-<div class="card" onclick="filtrarDashboard('Dormido')" id="cDor"></div>
-<div class="card" onclick="filtrarDashboard('hoy')" id="cHoy"></div>
-<div class="card" onclick="filtrarDashboard('atrasado')" id="cAtr"></div>
+<div class="card" onclick="filtrarDashboard('Prospecto')" id="cPros">Prospectos</div>
+<div class="card" onclick="filtrarDashboard('Oportunidad')" id="cOpo">Oportunidades</div>
+<div class="card" onclick="filtrarDashboard('Cliente')" id="cCli">Clientes</div>
+<div class="card" onclick="filtrarDashboard('Dormido')" id="cDor">Dormidos</div>
 </div>
 
 <table id="tabla">
 <thead>
 <tr>
-<th onclick="ordenar(event,0)">ID</th>
-<th onclick="ordenar(event,1)">Cliente</th>
-<th onclick="ordenar(event,2)">Contacto</th>
-<th onclick="ordenar(event,3)">Teléfono</th>
-<th onclick="ordenar(event,4)">Estado</th>
-<th onclick="ordenar(event,5)">Tarifa</th>
-<th onclick="ordenar(event,6)">Calle</th>
-<th onclick="ordenar(event,7)">Población</th>
-<th onclick="ordenar(event,8)">Provincia</th>
-<th onclick="ordenar(event,9)">Fecha</th>
-<th onclick="ordenar(event,10)">Temas</th>
-<th onclick="ordenar(event,11)">Pasos</th>
-<th onclick="ordenar(event,12)">Próx visita</th>
+<th>ID</th>
+<th>Cliente</th>
+<th>Estado</th>
+<th>Próx visita</th>
 <th>🗑️</th>
 </tr>
 </thead>
@@ -79,17 +68,19 @@ th{background:#eee;cursor:pointer;}
 <script>
 
 // ===== SERVICE WORKER =====
-if('serviceWorker' in navigator){
-navigator.serviceWorker.register('sw.js');
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js');
+  });
 }
 
 // ===== SUPABASE =====
-const db=supabase.createClient(
+const db = supabase.createClient(
 "https://ozicgtlajuxjpyvduvvr.supabase.co",
 "sb_publishable_R9aW8_6b6DcD9kQDbam-nw_ihlVv2id"
 );
 
-let criteriosOrden=[],calientes=[];
+let calientes=[];
 
 // ===== COMPONENTES =====
 function selectEstado(v=""){
@@ -112,16 +103,7 @@ let r=tabla.tBodies[0].insertRow(0);
 r.innerHTML=`
 <td contenteditable></td>
 <td contenteditable></td>
-<td contenteditable></td>
-<td contenteditable></td>
 <td>${selectEstado()}</td>
-<td contenteditable></td>
-<td contenteditable></td>
-<td contenteditable></td>
-<td contenteditable></td>
-<td contenteditable></td>
-<td contenteditable></td>
-<td contenteditable></td>
 <td>${inputFecha()}</td>
 <td><button onclick="eliminarFila(this)">❌</button></td>`;
 }
@@ -138,29 +120,9 @@ r.remove();
 function buscarGlobal(){
 let txt=busquedaGlobal.value.toLowerCase();
 document.querySelectorAll("#tabla tbody tr").forEach(r=>{
-let fila=[...r.cells].map(c=>c.innerText.toLowerCase()).join(" ");
+let fila=r.innerText.toLowerCase();
 r.style.display=fila.includes(txt)?"":"none";
 });
-}
-
-// ===== ORDEN =====
-function getValor(r,col){
-if(col==4) return r.cells[4].querySelector("select").value;
-if(col==12) return r.cells[12].querySelector("input").value;
-return r.cells[col].innerText;
-}
-
-function ordenar(e,col){
-if(!e.shiftKey) criteriosOrden=[];
-criteriosOrden.push({col,asc:true});
-
-let filas=[...tabla.tBodies[0].rows];
-filas.sort((a,b)=>{
-let A=getValor(a,col);
-let B=getValor(b,col);
-return A.localeCompare(B);
-});
-filas.forEach(f=>tabla.tBodies[0].appendChild(f));
 }
 
 // ===== IA =====
@@ -169,8 +131,8 @@ let hoy=new Date().toISOString().split("T")[0];
 calientes=[];
 
 document.querySelectorAll("#tabla tbody tr").forEach(r=>{
-let f=r.cells[12].querySelector("input").value;
-let estado=r.cells[4].querySelector("select").value;
+let f=r.cells[3].querySelector("input").value;
+let estado=r.cells[2].querySelector("select").value;
 let cliente=r.cells[1].innerText;
 
 if(f<hoy || estado=="Oportunidad") calientes.push(cliente);
@@ -182,24 +144,17 @@ function verCalientes(){
 alert(calientes.join("\n")||"Sin calientes");
 }
 
-// ===== DASHBOARD =====
-function filtrarDashboard(tipo){
-document.querySelectorAll("#tabla tbody tr").forEach(r=>{
-let estado=r.cells[4].querySelector("select").value;
-r.style.display=(estado==tipo||tipo=="")?"":"none";
-});
-}
-
 // ===== GUARDAR =====
 async function guardar(){
 for(let r of tabla.tBodies[0].rows){
 await db.from("clientes").upsert({
 id:r.cells[0].innerText,
 cliente:r.cells[1].innerText,
-estado:r.cells[4].querySelector("select").value
+estado:r.cells[2].querySelector("select").value,
+proxima:r.cells[3].querySelector("input").value
 });
 }
-alert("Guardado");
+alert("Guardado OK");
 }
 
 // ===== CARGAR =====
@@ -211,17 +166,8 @@ let r=tabla.tBodies[0].insertRow();
 r.innerHTML=`
 <td contenteditable>${d.id||""}</td>
 <td contenteditable>${d.cliente||""}</td>
-<td contenteditable></td>
-<td contenteditable></td>
 <td>${selectEstado(d.estado)}</td>
-<td contenteditable></td>
-<td contenteditable></td>
-<td contenteditable></td>
-<td contenteditable></td>
-<td contenteditable></td>
-<td contenteditable></td>
-<td contenteditable></td>
-<td>${inputFecha()}</td>
+<td>${inputFecha(d.proxima)}</td>
 <td><button onclick="eliminarFila(this)">❌</button></td>`;
 });
 }
