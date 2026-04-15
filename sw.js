@@ -1,19 +1,7 @@
-const CACHE = "crm-enterprise-v1";
-
-self.addEventListener("install", e => {
-  e.waitUntil(
-    caches.open(CACHE).then(cache => {
-      return cache.addAll([
-        "./",
-        "./index.html",
-        "./manifest.json"
-      ]);
-    })
-  );
+const CACHE="crm-final-v1";
+self.addEventListener("install",e=>{
+ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(["./","./index.html","./manifest.json"])));
 });
-
-self.addEventListener("fetch", e => {
-  e.respondWith(
-    caches.match(e.request).then(res => res || fetch(e.request))
-  );
+self.addEventListener("fetch",e=>{
+ e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));
 });
