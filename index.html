@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>CRM PRO</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0f172a">
+<link rel="icon" href="./icon-192.png">
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+<style>
+body{font-family:Arial;margin:10px;}
+button,input,select{margin:4px;padding:6px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+td,th{border:1px solid #ccc;padding:5px;}
+th{cursor:pointer;background:#eee;}
+
+.prospecto{background:#e0e0e0;}
+.oportunidad{background:#fff3cd;}
+.cliente{background:#d4edda;}
+.dormido{background:#f8d7da;}
+
+.hoy{outline:2px solid orange;}
+.atrasado{outline:2px solid red;}
+
+.dashboard{display:flex;gap:10px;flex-wrap:wrap;}
+.card{padding:10px;background:#f0f0f0;border-radius:8px;cursor:pointer;}
+</style>
+</head>
+
+<body>
+
+<h2>CRM PRO</h2>
+
+<button onclick="addRow()">➕ Nuevo</button>
+<button onclick="guardar()">💾 Guardar</button>
+<button onclick="cargar()">☁️ Recargar</button>
+<button onclick="exportarExcel()">📤 Exportar</button>
+
+<input type="file" id="fileInput" accept=".xlsx">
+<button onclick="importarExcel()">📥 Importar</button>
+
+<button onclick="verCalientes()">🔥 Calientes</button>
+
+<br>
+
+<input id="busquedaGlobal" placeholder="🔍 Buscar..." onkeyup="buscarGlobal()">
+
+<br>
+
+<input id="fCliente" placeholder="Cliente" onkeyup="filtrar()">
+<input id="fPoblacion" placeholder="Población" onkeyup="filtrar()">
+
+<select id="fEstado" onchange="filtrar()">
+<option value="">Estado</option>
+<option>Prospecto</option>
+<option>Oportunidad</option>
+<option>Cliente</option>
+<option>Dormido</option>
+</select>
+
+Desde <input type="date" id="fDesde" onchange="filtrar()">
+Hasta <input type="date" id="fHasta" onchange="filtrar()">
+
+<div class="dashboard">
+<div class="card" onclick="dash('Prospecto')" id="c1"></div>
+<div class="card" onclick="dash('Oportunidad')" id="c2"></div>
+<div class="card" onclick="dash('Cliente')" id="c3"></div>
+<div class="card" onclick="dash('Dormido')" id="c4"></div>
+<div class="card" onclick="dash('hoy')" id="c5"></div>
+<div class="card" onclick="dash('atrasado')" id="c6"></div>
+</div>
+
+<table id="tabla">
+<thead>
+<tr>
+<th onclick="sort(0)">ID</th>
+<th onclick="sort(1)">Cliente</th>
+<th onclick="sort(2)">Contacto</th>
+<th onclick="sort(3)">Teléfono</th>
+<th onclick="sort(4)">Estado</th>
+<th onclick="sort(5)">Tarifa</th>
+<th onclick="sort(6)">Calle</th>
+<th onclick="sort(7)">Población</th>
+<th onclick="sort(8)">Provincia</th>
+<th onclick="sort(9)">Fecha</th>
+<th onclick="sort(10)">Temas</th>
+<th onclick="sort(11)">Pasos</th>
+<th onclick="sort(12)">Próx visita</th>
+<th>🗑️</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<script>
+
+// SW
+if('serviceWorker' in navigator){
+navigator.serviceWorker.register('./sw.js');
+}
+
+// DB
+const db=supabase.createClient(
+"https://ozicgtlajuxjpyvduvvr.supabase.co",
+"sb_publishable_R9aW8_6b6DcD9kQDbam-nw_ihlVv2id"
+);
+
+let asc=true,calientes=[];
+
+// COMPONENTES
+function estadoSelect(v=""){
+return `<select onchange="updateAll()">
+<option value=""></option>
+<option ${v=="Prospecto"?"selected":""}>Prospecto</option>
+<option ${v=="Oportunidad"?"selected":""}>Oportunidad</option>
+<option ${v=="Cliente"?"selected":""}>Cliente</option>
+<option ${v=="Dormido"?"selected":""}>Dormido</option>
+</select>`;
+}
+
+function fechaInput(v=""){
+return `<input type="date" value="${v||""}" onchange="updateAll()">`;
+}
+
+// NUEVO
+function addRow(){
+let r=tabla.tBodies[0].insertRow(0);
+r.innerHTML=`
+<td contenteditable></td>
+<td contenteditable></td>
+<td contenteditable></td>
+<td contenteditable></td>
+<td>${estadoSelect()}</td>
+<td contenteditable></td>
+<td contenteditable></td>
+<td contenteditable></td>
+<td contenteditable></td>
+<td contenteditable></td>
+<td contenteditable></td>
+<td contenteditable></td>
+<td>${fechaInput()}</td>
+<td><button onclick="del(this)">❌
