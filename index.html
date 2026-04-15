@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>CRM ENTERPRISE PRO</title>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body { font-family: Arial; margin: 10px; }
+button, input, select { padding: 6px; margin: 4px; }
+
+table { width:100%; border-collapse: collapse; font-size:12px; }
+td,th { border:1px solid #ccc; padding:5px; }
+th { background:#eee; cursor:pointer; }
+
+.estado-prospecto{background:#e0e0e0;}
+.estado-oportunidad{background:#fff3cd;}
+.estado-cliente{background:#d4edda;}
+.estado-dormido{background:#f8d7da;}
+
+.hoy{outline:2px solid orange;}
+.atrasado{outline:2px solid red;}
+
+.dashboard { display:flex; gap:10px; flex-wrap:wrap; }
+.card { padding:10px; background:#f0f0f0; border-radius:8px; cursor:pointer; }
+
+.iaBox { background:#222; color:#fff; padding:10px; margin-top:10px; }
+</style>
+</head>
+
+<body>
+
+<h2>CRM ENTERPRISE PRO</h2>
+
+<button onclick="addRow()">➕ Nuevo</button>
+<button onclick="guardar()">💾 Guardar</button>
+<button onclick="cargar()">☁️ Recargar</button>
+<button onclick="exportarExcel()">📤 Exportar</button>
+
+<input type="file" id="fileInput" accept=".xlsx">
+<button onclick="importarExcel()">📥 Importar</button>
+
+<button onclick="verCalientes()">🔥 Calientes</button>
+
+<br>
+
+<input id="busquedaGlobal" placeholder="🔍 Buscar..." onkeyup="buscarGlobal()">
+
+<br>
+
+<input id="filtroCliente" placeholder="Cliente" onkeyup="filtrar()">
+<input id="filtroPoblacion" placeholder="Población" onkeyup="filtrar()">
+
+<select id="filtroEstado" onchange="filtrar()">
+<option value="">Estado</option>
+<option>Prospecto</option>
+<option>Oportunidad</option>
+<option>Cliente</option>
+<option>Dormido</option>
+</select>
+
+<br>
+
+Desde <input type="date" id="fechaDesde" onchange="filtrar()">
+Hasta <input type="date" id="fechaHasta" onchange="filtrar()">
+
+<div class="dashboard">
+<div class="card" onclick="filtrarDashboard('Prospecto')" id="cPros"></div>
+<div class="card" onclick="filtrarDashboard('Oportunidad')" id="cOpo"></div>
+<div class="card" onclick="filtrarDashboard('Cliente')" id="cCli"></div>
+<div class="card" onclick="filtrarDashboard('Dormido')" id="cDor"></div>
+<div class="card" onclick="filtrarDashboard('hoy')" id="cHoy"></div>
+<div class="card" onclick="filtrarDashboard('atrasado')" id="cAtr"></div>
+</div>
+
+<div class="iaBox" id="iaPanel">🤖 IA lista</div>
+
+<table id="tabla">
+<thead>
+<tr>
+<th onclick="ordenar(event,0)">ID</th>
+<th onclick="ordenar(event,1)">Cliente</th>
+<th onclick="ordenar(event,2)">Contacto</th>
+<th onclick="ordenar(event,3)">Estado</th>
+<th onclick="ordenar(event,4)">Tarifa</th>
+<th onclick="ordenar(event,5)">CP</th>
+<th onclick="ordenar(event,6)">Calle</th>
+<th onclick="ordenar(event,7)">Población</th>
+<th onclick="ordenar(event,8)">Provincia</th>
+<th onclick="ordenar(event,9)">Fecha</th>
+<th onclick="ordenar(event,10)">Tratado</th>
+<th onclick="ordenar(event,11)">Próximos pasos</th>
+<th onclick="ordenar(event,12)">Próx visita</th>
+<th>🗑️</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<script>
+
+// ===== SUPABASE =====
+const db=supabase.createClient(
+"https://ozicgtlajuxjpyvduvvr.supabase.co",
+"sb_publishable_R9aW8_6b6DcD9kQDbam-nw_ihlVv2id"
+);
+
+let criteriosOrden=[];
+let calientes=[];
+
+// ===== COMPONENTES =====
+function selectEstado(v=""){
+return `<select onchange="updateAll()">
+<option value=""></option>
+<option ${v=="Prospecto"?"selected":""}>Prospecto</option>
+<option ${v=="Oportunidad"?"selected":""}>Oportunidad</option>
+<option ${v=="Cliente"?"selected":""}>Cliente</option>
+<option ${v=="Dormido"?"selected":""}>Dormido</option>
+</select>`;
+}
+
+function inputFecha(v=""){
+return `<input type="date" value="${v||""}" onchange="updateAll()">`;
+}
+
+// ===== NUEVO =====
+function addRow(){
+let r=tabla.tBodies[0].insertRow(0);
+r.innerHTML=`
+<td contenteditable></td>
+<td contenteditable></td>
+<td contenteditable></td>
+<td>${selectEstado()}</td>
+<td contenteditable></td>
+<td contenteditable></td>
+<td contenteditable></td>
+<td contenteditable></td>
+<td contenteditable></td>
+<td contenteditable></td>
+<td contenteditable></td>
+<td contenteditable></td>
+<td>${inputFecha()}</td>
+<td><button onclick="eliminarFila(this)">❌</button></td>`;
+}
+
+// ===== ELIMINAR =====
+async function eliminarFila(btn){
+let r=btn.parentElement.parentElement;
+let id=r.cells[0].innerText;
+
+if(confirm("¿Eliminar cliente?")){
+await db.from("clientes").delete().eq("id",id);
+r.remove();
+updateAll();
+}
+}
+
+// ===== BUSCAR =====
+function buscarGlobal(){
+let txt=busquedaGlobal.value.toLowerCase();
+document.querySelectorAll("#tabla tbody tr").forEach(r=>{
+let fila=[...r.cells].map(c=>c.innerText.toLowerCase()).join(" ");
+r.style.display=fila.includes(txt)?"":"none";
+});
+}
+
+// ===== ORDEN =====
+function getValor(r,col){
+if(col==3) return r.cells[3].querySelector("select").value;
+if(col==12) return r.cells[12].querySelector("input").value;
+return r.cells[col].innerText;
+}
+
+function ordenar(e,col){
+if(!e.shiftKey) criteriosOrden=[];
+
+let ex=criteriosOrden.find(c=>c.col==col);
+if(ex) ex.asc=!ex.asc;
+else criteriosOrden.push({col,asc:true});
+
+let filas=[...tabla.tBodies[0].rows];
+
+filas.sort((a,b)=>{
+for(let c of criteriosOrden){
+let A=getValor(a,c.col);
+let B=getValor(b,c.col);
+
+if(!isNaN(A)&&!isNaN(B)){
+if(A!=B) return c.asc?A-B:B-A;
+}
+else if(Date.parse(A)&&Date.parse(B)){
+if(A!=B) return c.asc?new Date(A)-new Date(B):new Date(B)-new Date(A);
+}
+else{
+if(A!=B) return c.asc?A.localeCompare(B):B.localeCompare(A);
+}
+}
+return 0;
+});
+
+filas.forEach(f=>tabla.tBodies[0].appendChild(f));
+}
+
+// ===== UPDATE =====
+function updateAll(){
+let hoy=new Date().toISOString().split("T")[0];
+let hoyN=0,atr=0;
+calientes=[];
+
+document.querySelectorAll("#tabla tbody tr").forEach(r=>{
+let f=r.cells[12].querySelector("input").value;
+let estado=r.cells[3].querySelector("select").value;
+let cliente=r.cells[1].innerText;
+
+r.classList.remove("hoy","atrasado");
+
+if(f<hoy){r.classList.add("atrasado");atr++;calientes.push(cliente);}
+if(f==hoy){r.classList.add("hoy");hoyN++;}
+if(estado=="Oportunidad")calientes.push(cliente);
+});
+
+cHoy.innerText=hoyN+" Hoy";
+cAtr.innerText=atr+" Atrasados";
+
+iaPanel.innerText="Clientes calientes: "+calientes.length;
+
+stats();
+}
+
+// ===== STATS =====
+function stats(){
+let p=0,o=0,c=0,d=0;
+
+document.querySelectorAll("#tabla tbody tr").forEach(r=>{
+let e=r.cells[3].querySelector("select").value;
+if(e=="Prospecto")p++;
+if(e=="Oportunidad")o++;
+if(e=="Cliente")c++;
+if(e=="Dormido")d++;
+});
+
+cPros.innerText=p+" Prospectos";
+cOpo.innerText=o+" Oportunidades";
+cCli.innerText=c+" Clientes";
+cDor.innerText=d+" Dormidos";
+}
+
+// ===== GUARDAR =====
+async function guardar(){
+for(let r of tabla.tBodies[0].rows){
+await db.from("clientes").upsert({
+id:r.cells[0].innerText,
+cliente:r.cells[1].innerText,
+contacto:r.cells[2].innerText,
+estado:r.cells[3].querySelector("select").value,
+tarifa:r.cells[4].innerText,
+cp:r.cells[5].innerText,
+calle:r.cells[6].innerText,
+poblacion:r.cells[7].innerText,
+provincia:r.cells[8].innerText,
+fecha:r.cells[9].innerText,
+tratado:r.cells[10].innerText,
+pasos:r.cells[11].innerText,
+proxima:r.cells[12].querySelector("input").value
+});
+}
+alert("Guardado OK");
+}
+
+// ===== CARGAR =====
+async function cargar(){
+let {data}=await db.from("clientes").select("*");
+tabla.tBodies[0].innerHTML="";
+
+data.forEach(d=>{
+let r=tabla.tBodies[0].insertRow();
+r.innerHTML=`
+<td contenteditable>${d.id||""}</td>
+<td contenteditable>${d.cliente||""}</td>
+<td contenteditable>${d.contacto||""}</td>
+<td>${selectEstado(d.estado)}</td>
+<td contenteditable>${d.tarifa||""}</td>
+<td contenteditable>${d.cp||""}</td>
+<td contenteditable>${d.calle||""}</td>
+<td contenteditable>${d.poblacion||""}</td>
+<td contenteditable>${d.provincia||""}</td>
+<td contenteditable>${d.fecha||""}</td>
+<td contenteditable>${d.tratado||""}</td>
+<td contenteditable>${d.pasos||""}</td>
+<td>${inputFecha(d.proxima)}</td>
+<td><button onclick="eliminarFila(this)">❌</button></td>`;
+});
+
+updateAll();
+}
+
+// ===== INIT =====
+window.onload=()=>{
+cargar();
+setInterval(updateAll,60000);
+}
+
+</script>
+
+</body>
+</html>
